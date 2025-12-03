@@ -30,22 +30,30 @@ This repository provides a turnkey solution using [Infisical](https://infisical.
 
 ### For New Machines
 
+**IMPORTANT:** Run the bootstrap script from a project/working directory (not your home directory). This ensures the Infisical project context is saved correctly.
+
 **Windows (PowerShell):**
 ```powershell
+# Navigate to a project directory first
+cd C:\Projects  # or wherever you want to work
 irm https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/bootstrap-windows.ps1 | iex
 ```
 
 **Linux/Mac (Bash):**
 ```bash
+# Navigate to a project directory first
+cd ~/projects  # or wherever you want to work
 curl -fsSL https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/bootstrap-unix.sh | bash
 ```
 
 The bootstrap script will:
 1. Install Infisical CLI (if needed)
 2. Authenticate to your Infisical instance
-3. Download and configure the sync script
-4. Sync GitHub Copilot credentials to OpenCode
-5. **Optionally** sync OpenCode configuration from GitHub (includes Grok, Ollama, etc.)
+3. Initialize project (creates `.infisical.json` in current directory)
+4. Download and configure the sync script
+5. Sync GitHub Copilot credentials to OpenCode
+6. Sync OpenCode configuration from GitHub (includes Grok, Ollama, etc.)
+7. **Set up automatic daily sync at 3:00 AM**
 
 ### Sync OpenCode Configuration Only
 
