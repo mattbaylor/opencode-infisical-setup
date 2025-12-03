@@ -156,7 +156,52 @@ if ($SyncConfig) {
     Write-Host ""
 }
 
-Write-Host "To re-sync credentials in the future (e.g., when tokens are refreshed), run:" -ForegroundColor Yellow
+# Set up scheduled auto-sync
+Write-Host "[6/6] Setting up automatic daily credential sync..." -ForegroundColor Yellow
+
+try {
+    # Get the current directory where .infisical.json exists
+    $infisicalConfigPath = Get-ChildItem -Path . -Filter ".infisical.json" -ErrorAction SilentlyContinue
+    
+    if ($infisicalConfigPath) {
+        $workingDir = (Get-Location).Path
+    } else {
+        # Fallback to user's Documents folder
+        $workingDir = "$env:USERPROFILE\Documents"
+    }
+    
+    # Create wrapper script that changes to the correct directory
+    $wrapperScript = @"
+Set-Location -Path '$workingDir'
+& '$syncScriptPath'
+"@
+    
+    $wrapperScriptPath = "$env:USERPROFILE\sync-opencode-wrapper.ps1"
+    $wrapperScript | Out-File -FilePath $wrapperScriptPath -Encoding utf8 -Force
+    
+    # Create scheduled task
+    $action = New-ScheduledTaskAction -Execute "PowerShell.exe" -Argument "-WindowStyle Hidden -File `"$wrapperScriptPath`""
+    $trigger = New-ScheduledTaskTrigger -Daily -At 3am
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+    
+    # Remove existing task if it exists
+    $existingTask = Get-ScheduledTask -TaskName "Sync OpenCode Credentials" -ErrorAction SilentlyContinue
+    if ($existingTask) {
+        Unregister-ScheduledTask -TaskName "Sync OpenCode Credentials" -Confirm:$false
+    }
+    
+    Register-ScheduledTask -Action $action -Trigger $trigger -TaskName "Sync OpenCode Credentials" -Description "Daily sync of GitHub Copilot credentials from Infisical" -Settings $settings -User $env:USERNAME | Out-Null
+    
+    Write-Host "Scheduled task created! Credentials will auto-sync daily at 3:00 AM" -ForegroundColor Green
+} catch {
+    Write-Host "Failed to create scheduled task (non-fatal): $_" -ForegroundColor Yellow
+    Write-Host "You can create it manually if needed" -ForegroundColor Yellow
+}
+
+Write-Host ""
+Write-Host "=== All Done! ===" -ForegroundColor Green
+Write-Host ""
+Write-Host "To manually re-sync credentials anytime, run:" -ForegroundColor Yellow
 Write-Host "  & '$syncScriptPath'" -ForegroundColor White
 Write-Host ""
 Write-Host "You can now use OpenCode with GitHub Copilot without authentication issues across VMs!" -ForegroundColor Green

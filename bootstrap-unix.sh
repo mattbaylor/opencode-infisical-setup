@@ -150,7 +150,34 @@ if [ "$SYNC_CONFIG" = "true" ]; then
     echo ""
 fi
 
-echo "To re-sync credentials in the future (e.g., when tokens are refreshed), run:"
+# Set up automatic daily sync via cron
+echo "[6/6] Setting up automatic daily credential sync..."
+
+# Get current directory for .infisical.json context
+CURRENT_DIR=$(pwd)
+
+# Create a wrapper script that includes the directory change
+WRAPPER_SCRIPT="$HOME/sync-opencode-wrapper.sh"
+cat > "$WRAPPER_SCRIPT" << EOF
+#!/bin/bash
+cd "$CURRENT_DIR"
+"$SYNC_SCRIPT_PATH"
+EOF
+
+chmod +x "$WRAPPER_SCRIPT"
+
+# Add to crontab if not already present
+if ! crontab -l 2>/dev/null | grep -q "sync-opencode-wrapper.sh"; then
+    (crontab -l 2>/dev/null; echo "0 3 * * * $WRAPPER_SCRIPT") | crontab -
+    echo "Cron job added! Credentials will auto-sync daily at 3:00 AM"
+else
+    echo "Cron job already exists"
+fi
+
+echo ""
+echo "=== All Done! ==="
+echo ""
+echo "To manually re-sync credentials anytime, run:"
 echo "  $SYNC_SCRIPT_PATH"
 echo ""
 echo "You can now use OpenCode with GitHub Copilot without authentication issues across VMs!"
