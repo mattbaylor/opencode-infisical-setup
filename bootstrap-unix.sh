@@ -19,6 +19,7 @@
 set -e
 
 INFISICAL_DOMAIN="${INFISICAL_DOMAIN:-https://infisical.thebaylors.org}"
+SYNC_CONFIG="${SYNC_CONFIG:-true}"
 
 echo "=== OpenCode + Infisical Bootstrap Script ==="
 echo ""
@@ -135,6 +136,20 @@ echo "=== Setup Complete! ==="
 echo ""
 echo "Your OpenCode installation is now configured to use shared GitHub Copilot credentials from Infisical."
 echo ""
+
+# Optionally sync OpenCode config
+if [ "$SYNC_CONFIG" = "true" ]; then
+    echo "[Bonus] Syncing OpenCode configuration from GitHub..."
+    if curl -fsSL https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/sync-config.sh | bash; then
+        echo "OpenCode configuration synced successfully!"
+    else
+        echo "Failed to sync OpenCode config (non-fatal)"
+        echo "You can sync it manually later with:"
+        echo "  curl -fsSL https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/sync-config.sh | bash"
+    fi
+    echo ""
+fi
+
 echo "To re-sync credentials in the future (e.g., when tokens are refreshed), run:"
 echo "  $SYNC_SCRIPT_PATH"
 echo ""

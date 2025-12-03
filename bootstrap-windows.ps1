@@ -13,12 +13,16 @@
 .PARAMETER InfisicalDomain
     The domain of your Infisical instance (default: https://infisical.thebaylors.org)
 
+.PARAMETER SyncConfig
+    Also sync OpenCode configuration from GitHub (default: $true)
+
 .EXAMPLE
     irm https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/bootstrap-windows.ps1 | iex
 #>
 
 param(
-    [string]$InfisicalDomain = "https://infisical.thebaylors.org"
+    [string]$InfisicalDomain = "https://infisical.thebaylors.org",
+    [bool]$SyncConfig = $true
 )
 
 $ErrorActionPreference = "Stop"
@@ -137,6 +141,21 @@ Write-Host "=== Setup Complete! ===" -ForegroundColor Green
 Write-Host ""
 Write-Host "Your OpenCode installation is now configured to use shared GitHub Copilot credentials from Infisical." -ForegroundColor Cyan
 Write-Host ""
+
+# Optionally sync OpenCode config
+if ($SyncConfig) {
+    Write-Host "[Bonus] Syncing OpenCode configuration from GitHub..." -ForegroundColor Yellow
+    try {
+        $configSyncScript = Invoke-WebRequest -Uri "https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/sync-config.ps1" -UseBasicParsing
+        Invoke-Expression $configSyncScript.Content
+    } catch {
+        Write-Host "Failed to sync OpenCode config (non-fatal): $_" -ForegroundColor Yellow
+        Write-Host "You can sync it manually later with:" -ForegroundColor Yellow
+        Write-Host "  irm https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/sync-config.ps1 | iex" -ForegroundColor White
+    }
+    Write-Host ""
+}
+
 Write-Host "To re-sync credentials in the future (e.g., when tokens are refreshed), run:" -ForegroundColor Yellow
 Write-Host "  & '$syncScriptPath'" -ForegroundColor White
 Write-Host ""

@@ -45,6 +45,29 @@ The bootstrap script will:
 2. Authenticate to your Infisical instance
 3. Download and configure the sync script
 4. Sync GitHub Copilot credentials to OpenCode
+5. **Optionally** sync OpenCode configuration from GitHub (includes Grok, Ollama, etc.)
+
+### Sync OpenCode Configuration Only
+
+If you just want to sync your OpenCode configuration (model providers) without setting up Infisical:
+
+**Windows:**
+```powershell
+irm https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/sync-config.ps1 | iex
+```
+
+**Linux/Mac:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/sync-config.sh | bash
+```
+
+This will download a pre-configured `opencode.json` with:
+- Ollama Local (127.0.0.1:11434)
+- Ollama Remote (192.168.11.80:11434)
+- Grok (xAI) - requires API key
+- Ready to add more providers (DeepSeek, Groq, OpenRouter, etc.)
+
+See [config-templates/README.md](config-templates/README.md) for customization options.
 
 ### Re-sync Credentials
 

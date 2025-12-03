@@ -1,0 +1,66 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "ollama-local": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama Local",
+      "options": {
+        "baseURL": "http://127.0.0.1:11434/v1"
+      },
+      "models": {
+        "qwen2.5-coder:latest": {
+          "name": "Qwen 2.5 Coder"
+        },
+        "qwen3:8b": {
+          "name": "Qwen 3 8B"
+        },
+        "mistral:latest": {
+          "name": "Mistral"
+        },
+        "llama3.1:8b": {
+          "name": "Llama 3.1 8B"
+        }
+      }
+    },
+    "ollama-remote": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama Remote (192.168.11.80)",
+      "options": {
+        "baseURL": "http://192.168.11.80:11434/v1"
+      },
+      "models": {
+        "qwen:4b": {
+          "name": "Qwen 4B"
+        },
+        "qwen3-coder:30b": {
+          "name": "Qwen 3 Coder 30B"
+        },
+        "qwen3-coder-30b-custom:latest": {
+          "name": "Qwen 3 Coder 30B Custom"
+        },
+        "llama3.1:70b": {
+          "name": "Llama 3.1 70B"
+        },
+        "gpt-oss:20b": {
+          "name": "GPT OSS 20B"
+        }
+      }
+    },
+    "grok": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Grok (xAI)",
+      "options": {
+        "baseURL": "https://api.x.ai/v1",
+        "apiKey": "${XAI_API_KEY}"
+      },
+      "models": {
+        "grok-beta": {
+          "name": "Grok Beta"
+        },
+        "grok-vision-beta": {
+          "name": "Grok Vision Beta"
+        }
+      }
+    }
+  }
+}
