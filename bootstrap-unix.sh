@@ -179,24 +179,18 @@ fi
 # Step 2: Authenticate to Infisical
 print_header "[2/6] Authenticating to Infisical"
 
-# Check if already logged in - use a simple test that doesn't fail the script
+# Try to get a token to verify we're logged in
 print_info "Checking authentication status..."
-AUTH_CHECK=$(infisical user get --domain="$INFISICAL_DOMAIN" 2>&1 || true)
-
-if echo "$AUTH_CHECK" | grep -qi "email"; then
-    # Already logged in successfully
+if infisical user get token --domain="$INFISICAL_DOMAIN" --silent 2>/dev/null 1>/dev/null; then
+    # Successfully got a token - we're logged in
     print_step "Already logged in to Infisical"
-    EMAIL_LINE=$(echo "$AUTH_CHECK" | grep -i "email" | head -n1)
-    if [ -n "$EMAIL_LINE" ]; then
-        print_info "$EMAIL_LINE"
-    fi
 else
     # Not logged in - need to authenticate
     
     # Detect if running interactively (has TTY) or piped/SSH
     if [ -t 0 ] && [ -t 1 ]; then
         # Interactive terminal - can use browser or interactive login
-        print_info "Not logged in. Attempting browser-based authentication..."
+        print_info "Not logged in. Attempting authentication..."
         print_info "Domain: $INFISICAL_DOMAIN"
         echo ""
         
@@ -224,7 +218,7 @@ else
         print_info "Please login first, then run this script:"
         print_info ""
         print_info "  # Login to Infisical"
-        print_info "  infisical login --domain=$INFISICAL_DOMAIN"
+        print_info "  infisical login --domain=$INFISICAL_DOMAIN -i"
         print_info ""
         print_info "  # Then download and run this script"
         print_info "  curl -fsSL https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/bootstrap-unix.sh -o bootstrap.sh"
