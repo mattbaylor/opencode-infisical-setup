@@ -82,41 +82,95 @@ echo ""
 # Step 1: Check/Install Infisical CLI
 print_header "[1/6] Checking Infisical CLI"
 
+# Minimum required version
+REQUIRED_VERSION="0.100.0"
+
+# Function to compare versions
+version_ge() {
+    # Returns 0 (true) if $1 >= $2
+    printf '%s\n%s' "$2" "$1" | sort -V -C
+}
+
+# Check if installed and version
+NEEDS_INSTALL=false
 if command -v infisical &> /dev/null; then
-    INFISICAL_VERSION=$(infisical --version 2>&1 | head -n1 || echo "unknown")
-    print_step "Infisical CLI already installed: $INFISICAL_VERSION"
+    INFISICAL_VERSION=$(infisical --version 2>&1 | grep -oP 'v?\K[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || echo "0.0.0")
+    print_info "Infisical CLI found: v$INFISICAL_VERSION"
+    
+    if version_ge "$INFISICAL_VERSION" "$REQUIRED_VERSION"; then
+        print_step "Version is recent enough (>= v$REQUIRED_VERSION)"
+    else
+        print_info "Version is too old (< v$REQUIRED_VERSION), will reinstall"
+        NEEDS_INSTALL=true
+        
+        # Remove old version
+        if [ "$OS" = "debian" ]; then
+            print_info "Removing old version..."
+            sudo apt-get remove -y infisical 2>/dev/null || true
+            sudo rm -f /etc/apt/sources.list.d/infisical*.list
+        elif [ "$OS" = "redhat" ]; then
+            sudo yum remove -y infisical 2>/dev/null || true
+        fi
+    fi
 else
     print_info "Infisical CLI not found. Installing..."
+    NEEDS_INSTALL=true
+fi
+
+if [ "$NEEDS_INSTALL" = true ]; then
+    print_info "Installing latest Infisical CLI from official install script..."
     
-    case $OS in
-        debian)
-            print_info "Installing via apt..."
-            curl -1sLf 'https://dl.cloudsmith.io/public/infisical/infisical-cli/setup.deb.sh' | sudo -E bash
-            sudo apt-get update && sudo apt-get install -y infisical
-            ;;
-        redhat)
-            print_info "Installing via yum..."
-            curl -1sLf 'https://dl.cloudsmith.io/public/infisical/infisical-cli/setup.rpm.sh' | sudo -E bash
-            sudo yum install -y infisical
-            ;;
-        macos)
-            if command -v brew &> /dev/null; then
-                print_info "Installing via Homebrew..."
-                brew install infisical/get-cli/infisical
-            else
-                print_error "Homebrew not found. Please install Homebrew first:"
-                print_info "https://brew.sh"
+    # Use official install script (works on all platforms)
+    if curl -1sLf 'https://cli.infisical.com/install.sh' | bash; then
+        print_step "Infisical CLI installed successfully!"
+        
+        # Verify installation
+        if command -v infisical &> /dev/null; then
+            NEW_VERSION=$(infisical --version 2>&1 | grep -oP 'v?\K[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || echo "unknown")
+            print_info "Installed version: v$NEW_VERSION"
+        fi
+    else
+        print_error "Automatic installation failed. Trying alternative method..."
+        
+        # Fallback: Direct download from GitHub
+        case $OS in
+            debian|linux)
+                print_info "Downloading from GitHub releases..."
+                ARCH=$(uname -m)
+                if [ "$ARCH" = "x86_64" ]; then
+                    ARCH="amd64"
+                elif [ "$ARCH" = "aarch64" ]; then
+                    ARCH="arm64"
+                fi
+                
+                INSTALL_DIR="/usr/local/bin"
+                sudo curl -fsSL "https://github.com/Infisical/infisical/releases/latest/download/infisical_linux_${ARCH}" -o "$INSTALL_DIR/infisical"
+                sudo chmod +x "$INSTALL_DIR/infisical"
+                ;;
+            macos)
+                if command -v brew &> /dev/null; then
+                    print_info "Installing via Homebrew..."
+                    brew install infisical/get-cli/infisical
+                else
+                    print_error "Homebrew not found. Please install Homebrew first:"
+                    print_info "https://brew.sh"
+                    exit 1
+                fi
+                ;;
+            *)
+                print_error "Unsupported OS. Please install Infisical CLI manually:"
+                print_info "https://infisical.com/docs/cli/overview"
                 exit 1
-            fi
-            ;;
-        *)
-            print_error "Unsupported OS. Please install Infisical CLI manually:"
-            print_info "https://infisical.com/docs/cli/overview"
+                ;;
+        esac
+        
+        if command -v infisical &> /dev/null; then
+            print_step "Infisical CLI installed successfully!"
+        else
+            print_error "Installation failed. Please install manually and try again."
             exit 1
-            ;;
-    esac
-    
-    print_step "Infisical CLI installed successfully!"
+        fi
+    fi
 fi
 
 # Step 2: Authenticate to Infisical
