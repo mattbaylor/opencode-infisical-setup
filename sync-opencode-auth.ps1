@@ -4,9 +4,9 @@
 # It's designed to be run automatically via Task Scheduler or manually when needed.
 
 # Colors for output
-function Write-Success { Write-Host "✓ $args" -ForegroundColor Green }
-function Write-Error { Write-Host "✗ $args" -ForegroundColor Red }
-function Write-Info { Write-Host "ℹ $args" -ForegroundColor Yellow }
+function Write-Success { Write-Host "[OK] $args" -ForegroundColor Green }
+function Write-ErrorMsg { Write-Host "[ERROR] $args" -ForegroundColor Red }
+function Write-Info { Write-Host "[INFO] $args" -ForegroundColor Yellow }
 
 # Configuration
 $OPENCODE_AUTH_DIR = "$env:USERPROFILE\.local\share\opencode"
@@ -14,14 +14,14 @@ $OPENCODE_AUTH_FILE = "$OPENCODE_AUTH_DIR\auth.json"
 
 # Check if infisical is available
 if (-not (Get-Command infisical -ErrorAction SilentlyContinue)) {
-    Write-Error "Infisical CLI not found"
+    Write-ErrorMsg "Infisical CLI not found"
     Write-Info "Please install it from: https://infisical.com/docs/cli/overview"
     exit 1
 }
 
 # Check if we're in a directory with .infisical.json
 if (-not (Test-Path ".infisical.json")) {
-    Write-Error "No .infisical.json found in current directory"
+    Write-ErrorMsg "No .infisical.json found in current directory"
     Write-Info "Please run this script from the directory where you initialized Infisical"
     Write-Info "Or run 'infisical init' to set up the project in this directory"
     exit 1
@@ -38,7 +38,7 @@ try {
         throw "Failed to fetch credentials"
     }
 } catch {
-    Write-Error "Failed to fetch credentials from Infisical"
+    Write-ErrorMsg "Failed to fetch credentials from Infisical"
     Write-Info "Make sure you're logged in: infisical login"
     Write-Info "Make sure the secrets exist in your Infisical project"
     exit 1
@@ -49,7 +49,7 @@ try {
 if ($accessToken -match 'exp=(\d+)') {
     $expiresTimestamp = [long]$matches[1] * 1000  # Convert to milliseconds
 } else {
-    Write-Error "Could not extract expiry from access token"
+    Write-ErrorMsg "Could not extract expiry from access token"
     $expiresTimestamp = 1764799262000  # Fallback to default
 }
 
