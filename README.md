@@ -57,24 +57,39 @@ From the output, add these **two secrets** to your Infisical "OpenCode" project:
 
 ### Setup New Machines
 
-**IMPORTANT:** Navigate to a project/working directory first (not your home directory). This ensures `.infisical.json` is saved correctly.
+**IMPORTANT:** 
+1. Navigate to a project/working directory first (not your home directory). This ensures `.infisical.json` is saved correctly.
+2. For remote/SSH sessions, login to Infisical FIRST before running the bootstrap script.
 
 **Windows (PowerShell):**
 ```powershell
 # Navigate to a project directory first
 cd C:\Projects  # or wherever you want to work
 
-# Run bootstrap
+# Run bootstrap (interactive - will open browser)
 irm https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/bootstrap-windows.ps1 | iex
 ```
 
-**Linux/Mac (Bash):**
+**Linux/Mac (Bash) - Local Machine:**
 ```bash
 # Navigate to a project directory first
 cd ~/projects  # or wherever you want to work
 
-# Run bootstrap
+# Run bootstrap (interactive - will open browser)
 curl -fsSL https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/bootstrap-unix.sh | bash
+```
+
+**Linux/Mac (Bash) - Remote/SSH Session:**
+```bash
+# Navigate to a project directory first
+cd ~/projects  # or wherever you want to work
+
+# Step 1: Login first (required for SSH sessions)
+infisical login --domain=https://infisical.thebaylors.org -i
+
+# Step 2: Download and run bootstrap
+curl -fsSL https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/bootstrap-unix.sh -o bootstrap.sh
+bash bootstrap.sh
 ```
 
 The bootstrap script will:

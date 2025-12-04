@@ -179,23 +179,59 @@ fi
 # Step 2: Authenticate to Infisical
 print_header "[2/6] Authenticating to Infisical"
 
-# Check if already logged in by trying to list secrets (more reliable than 'user' command)
+# Check if already logged in - use a simple test that doesn't fail the script
 print_info "Checking authentication status..."
-if infisical user --domain="$INFISICAL_DOMAIN" 2>&1 | grep -q "email"; then
-    CURRENT_USER=$(infisical user --domain="$INFISICAL_DOMAIN" 2>/dev/null | grep -i email || echo "logged in")
+AUTH_CHECK=$(infisical user --domain="$INFISICAL_DOMAIN" 2>&1 || true)
+
+if echo "$AUTH_CHECK" | grep -qi "email"; then
+    # Already logged in successfully
     print_step "Already logged in to Infisical"
-    print_info "User: $CURRENT_USER"
+    EMAIL_LINE=$(echo "$AUTH_CHECK" | grep -i "email" | head -n1)
+    if [ -n "$EMAIL_LINE" ]; then
+        print_info "$EMAIL_LINE"
+    fi
 else
-    print_info "Not logged in. Opening browser for authentication to: $INFISICAL_DOMAIN"
+    # Not logged in - need to authenticate
     
-    if ! infisical login --domain="$INFISICAL_DOMAIN"; then
-        print_error "Failed to authenticate to Infisical"
-        print_info "Please check that $INFISICAL_DOMAIN is accessible"
-        print_info "You can also login manually first: infisical login --domain=$INFISICAL_DOMAIN"
+    # Detect if running interactively (has TTY) or piped/SSH
+    if [ -t 0 ] && [ -t 1 ]; then
+        # Interactive terminal - can use browser or interactive login
+        print_info "Not logged in. Attempting browser-based authentication..."
+        print_info "Domain: $INFISICAL_DOMAIN"
+        echo ""
+        
+        # Try login with -i flag if over SSH (detect SSH_CONNECTION or SSH_TTY)
+        if [ -n "$SSH_CONNECTION" ] || [ -n "$SSH_TTY" ] || [ -n "$SSH_CLIENT" ]; then
+            print_info "SSH session detected - using interactive CLI login (no browser)"
+            if ! infisical login --domain="$INFISICAL_DOMAIN" -i; then
+                print_error "Authentication failed"
+                exit 1
+            fi
+        else
+            # Local terminal - try browser-based login
+            if ! infisical login --domain="$INFISICAL_DOMAIN"; then
+                print_error "Authentication failed"
+                exit 1
+            fi
+        fi
+        
+        print_step "Successfully authenticated!"
+    else
+        # Non-interactive (piped through curl, cron, etc.)
+        print_error "Not logged in to Infisical"
+        print_info ""
+        print_info "This script requires authentication but is running non-interactively."
+        print_info "Please login first, then run this script:"
+        print_info ""
+        print_info "  # Login to Infisical"
+        print_info "  infisical login --domain=$INFISICAL_DOMAIN"
+        print_info ""
+        print_info "  # Then download and run this script"
+        print_info "  curl -fsSL https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/bootstrap-unix.sh -o bootstrap.sh"
+        print_info "  bash bootstrap.sh"
+        print_info ""
         exit 1
     fi
-    
-    print_step "Successfully authenticated!"
 fi
 
 # Step 3: Initialize Infisical project
