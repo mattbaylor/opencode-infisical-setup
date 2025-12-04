@@ -154,7 +154,7 @@ if (Test-Path ".infisical.json") {
     Write-Info "Please select your organization and the 'OpenCode' project"
     Write-Host ""
     
-    infisical init
+    infisical init --domain="$InfisicalDomain"
     
     if ($LASTEXITCODE -ne 0) {
         Write-ErrorMsg "Failed to initialize Infisical project"

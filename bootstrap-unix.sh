@@ -208,7 +208,7 @@ else
     print_info "Please select your organization and the 'OpenCode' project"
     echo ""
     
-    if ! infisical init; then
+    if ! infisical init --domain="$INFISICAL_DOMAIN"; then
         print_error "Failed to initialize Infisical project"
         print_info "Make sure the 'OpenCode' project exists in your Infisical instance"
         exit 1
