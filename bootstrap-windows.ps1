@@ -47,9 +47,9 @@ function Write-Header {
     Write-Host ""
 }
 
-function Write-Step { Write-Host "✓ $args" -ForegroundColor Green }
-function Write-ErrorMsg { Write-Host "✗ $args" -ForegroundColor Red }
-function Write-Info { Write-Host "ℹ $args" -ForegroundColor Yellow }
+function Write-Step { Write-Host "[OK] $args" -ForegroundColor Green }
+function Write-ErrorMsg { Write-Host "[ERROR] $args" -ForegroundColor Red }
+function Write-Info { Write-Host "[INFO] $args" -ForegroundColor Yellow }
 
 Write-Header "OpenCode + Infisical Bootstrap"
 
@@ -265,11 +265,11 @@ Write-Header "Setup Complete!"
 Write-Host "Your OpenCode installation is now configured!" -ForegroundColor Green
 Write-Host ""
 Write-Host "Summary:"
-Write-Host "  ✓ Infisical CLI installed and authenticated"
-Write-Host "  ✓ Project initialized in: $CURRENT_DIR"
-Write-Host "  ✓ Sync script installed: $SYNC_SCRIPT_PATH"
-Write-Host "  ✓ GitHub Copilot credentials synced"
-Write-Host "  ✓ Automatic daily sync configured (3:00 AM)"
+Write-Host "  [OK] Infisical CLI installed and authenticated"
+Write-Host "  [OK] Project initialized in: $CURRENT_DIR"
+Write-Host "  [OK] Sync script installed: $SYNC_SCRIPT_PATH"
+Write-Host "  [OK] GitHub Copilot credentials synced"
+Write-Host "  [OK] Automatic daily sync configured (3:00 AM)"
 Write-Host ""
 Write-Host "Usage:"
 Write-Host "  - Manual sync anytime: .\$SYNC_SCRIPT_PATH"
