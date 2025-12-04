@@ -83,7 +83,7 @@ echo ""
 print_header "[1/6] Checking Infisical CLI"
 
 # Minimum required version
-REQUIRED_VERSION="0.100.0"
+REQUIRED_VERSION="0.40.0"
 
 # Function to compare versions
 version_ge() {
@@ -118,89 +118,80 @@ else
 fi
 
 if [ "$NEEDS_INSTALL" = true ]; then
-    print_info "Installing latest Infisical CLI from official install script..."
+    print_info "Installing latest Infisical CLI..."
     
-    # Use official install script (works on all platforms)
-    if curl -1sLf 'https://cli.infisical.com/install.sh' | bash; then
-        print_step "Infisical CLI installed successfully!"
-        
-        # Reload PATH to pick up new installation
-        export PATH="/usr/local/bin:$PATH"
-        hash -r  # Clear bash's command cache
-        
-        # Verify installation
-        if command -v infisical &> /dev/null; then
-            NEW_VERSION=$(infisical --version 2>&1 | grep -oP 'v?\K[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || echo "unknown")
-            print_info "Installed version: v$NEW_VERSION"
-        else
-            print_error "Infisical installed but not found in PATH. Trying direct path..."
-            # Try common installation locations
-            for POSSIBLE_PATH in /usr/local/bin/infisical /usr/bin/infisical ~/.local/bin/infisical; do
-                if [ -x "$POSSIBLE_PATH" ]; then
-                    print_info "Found at: $POSSIBLE_PATH"
-                    export PATH="$(dirname $POSSIBLE_PATH):$PATH"
-                    break
-                fi
-            done
-        fi
-    else
-        print_error "Automatic installation failed. Trying alternative method..."
-        
-        # Fallback: Direct download from GitHub
-        case $OS in
-            debian|linux)
-                print_info "Downloading from GitHub releases..."
-                ARCH=$(uname -m)
-                if [ "$ARCH" = "x86_64" ]; then
-                    ARCH="amd64"
-                elif [ "$ARCH" = "aarch64" ]; then
-                    ARCH="arm64"
-                fi
+    # Use direct GitHub releases download (most reliable method)
+    case $OS in
+        debian|linux)
+            print_info "Downloading from GitHub releases..."
+            ARCH=$(uname -m)
+            if [ "$ARCH" = "x86_64" ]; then
+                ARCH="amd64"
+            elif [ "$ARCH" = "aarch64" ]; then
+                ARCH="arm64"
+            fi
+            
+            # Get latest version
+            LATEST_VERSION=$(curl -s https://api.github.com/repos/Infisical/cli/releases/latest | grep '"tag_name"' | cut -d'"' -f4)
+            print_info "Latest version: $LATEST_VERSION"
+            
+            # Download and extract tarball
+            DOWNLOAD_URL="https://github.com/Infisical/cli/releases/download/${LATEST_VERSION}/cli_${LATEST_VERSION#v}_linux_${ARCH}.tar.gz"
+            if curl -fsSL "$DOWNLOAD_URL" | sudo tar -xz -C /usr/local/bin; then
+                print_step "Infisical CLI installed successfully!"
                 
-                INSTALL_DIR="/usr/local/bin"
-                sudo curl -fsSL "https://github.com/Infisical/infisical/releases/latest/download/infisical_linux_${ARCH}" -o "$INSTALL_DIR/infisical"
-                sudo chmod +x "$INSTALL_DIR/infisical"
-                ;;
-            macos)
-                if command -v brew &> /dev/null; then
-                    print_info "Installing via Homebrew..."
-                    brew install infisical/get-cli/infisical
+                # Ensure /usr/local/bin is in PATH
+                export PATH="/usr/local/bin:$PATH"
+                hash -r  # Clear bash's command cache
+                
+                # Verify installation
+                if command -v infisical &> /dev/null; then
+                    NEW_VERSION=$(infisical --version 2>&1 | grep -oP 'v?\K[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || echo "unknown")
+                    print_info "Installed version: v$NEW_VERSION"
                 else
-                    print_error "Homebrew not found. Please install Homebrew first:"
-                    print_info "https://brew.sh"
+                    print_error "Installation succeeded but infisical not found in PATH"
+                    print_info "Try running: export PATH=\"/usr/local/bin:\$PATH\" && hash -r"
                     exit 1
                 fi
-                ;;
-            *)
-                print_error "Unsupported OS. Please install Infisical CLI manually:"
-                print_info "https://infisical.com/docs/cli/overview"
+            else
+                print_error "Failed to download from GitHub"
                 exit 1
-                ;;
-        esac
-        
-        if command -v infisical &> /dev/null; then
-            print_step "Infisical CLI installed successfully!"
-        else
-            print_error "Installation failed. Please install manually and try again."
+            fi
+            ;;
+        macos)
+            if command -v brew &> /dev/null; then
+                print_info "Installing via Homebrew..."
+                brew install infisical/get-cli/infisical
+            else
+                print_error "Homebrew not found. Please install Homebrew first:"
+                print_info "https://brew.sh"
+                exit 1
+            fi
+            ;;
+        *)
+            print_error "Unsupported OS. Please install Infisical CLI manually:"
+            print_info "https://infisical.com/docs/cli/overview"
             exit 1
-        fi
-    fi
+            ;;
+    esac
 fi
 
 # Step 2: Authenticate to Infisical
 print_header "[2/6] Authenticating to Infisical"
 
-# Check if already logged in
-if infisical user &> /dev/null; then
-    CURRENT_USER=$(infisical user 2>/dev/null | grep -i email || echo "Unknown")
+# Check if already logged in by trying to list secrets (more reliable than 'user' command)
+print_info "Checking authentication status..."
+if infisical user --domain="$INFISICAL_DOMAIN" 2>&1 | grep -q "email"; then
+    CURRENT_USER=$(infisical user --domain="$INFISICAL_DOMAIN" 2>/dev/null | grep -i email || echo "logged in")
     print_step "Already logged in to Infisical"
-    print_info "Current user: $CURRENT_USER"
+    print_info "User: $CURRENT_USER"
 else
-    print_info "Opening browser for authentication to: $INFISICAL_DOMAIN"
+    print_info "Not logged in. Opening browser for authentication to: $INFISICAL_DOMAIN"
     
     if ! infisical login --domain="$INFISICAL_DOMAIN"; then
         print_error "Failed to authenticate to Infisical"
         print_info "Please check that $INFISICAL_DOMAIN is accessible"
+        print_info "You can also login manually first: infisical login --domain=$INFISICAL_DOMAIN"
         exit 1
     fi
     
