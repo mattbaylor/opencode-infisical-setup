@@ -124,10 +124,24 @@ if [ "$NEEDS_INSTALL" = true ]; then
     if curl -1sLf 'https://cli.infisical.com/install.sh' | bash; then
         print_step "Infisical CLI installed successfully!"
         
+        # Reload PATH to pick up new installation
+        export PATH="/usr/local/bin:$PATH"
+        hash -r  # Clear bash's command cache
+        
         # Verify installation
         if command -v infisical &> /dev/null; then
             NEW_VERSION=$(infisical --version 2>&1 | grep -oP 'v?\K[0-9]+\.[0-9]+\.[0-9]+' | head -n1 || echo "unknown")
             print_info "Installed version: v$NEW_VERSION"
+        else
+            print_error "Infisical installed but not found in PATH. Trying direct path..."
+            # Try common installation locations
+            for POSSIBLE_PATH in /usr/local/bin/infisical /usr/bin/infisical ~/.local/bin/infisical; do
+                if [ -x "$POSSIBLE_PATH" ]; then
+                    print_info "Found at: $POSSIBLE_PATH"
+                    export PATH="$(dirname $POSSIBLE_PATH):$PATH"
+                    break
+                fi
+            done
         fi
     else
         print_error "Automatic installation failed. Trying alternative method..."
