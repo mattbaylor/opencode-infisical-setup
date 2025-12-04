@@ -181,7 +181,7 @@ print_header "[2/6] Authenticating to Infisical"
 
 # Check if already logged in - use a simple test that doesn't fail the script
 print_info "Checking authentication status..."
-AUTH_CHECK=$(infisical user --domain="$INFISICAL_DOMAIN" 2>&1 || true)
+AUTH_CHECK=$(infisical user get --domain="$INFISICAL_DOMAIN" 2>&1 || true)
 
 if echo "$AUTH_CHECK" | grep -qi "email"; then
     # Already logged in successfully
