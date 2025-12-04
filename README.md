@@ -1,6 +1,6 @@
 # OpenCode + Infisical Setup
 
-**Solve GitHub Copilot authentication collisions across multiple machines/VMs when using OpenCode.**
+**The bulletproof solution for sharing GitHub Copilot credentials across all your machines without session conflicts.**
 
 ## The Problem
 
@@ -12,30 +12,59 @@ When using OpenCode with GitHub Copilot across multiple machines or VMs, each au
 
 ## The Solution
 
-This repository provides a turnkey solution using [Infisical](https://infisical.com) to centrally manage and distribute GitHub Copilot credentials across all your machines.
+This repository provides a fully automatic, robust solution using [Infisical](https://infisical.com) to centrally manage and distribute GitHub Copilot credentials across all your machines.
 
-### Architecture
+### How It Works
 
-1. **Infisical Server** - Self-hosted secret manager stores GitHub Copilot tokens
-2. **Sync Scripts** - Stored in Infisical, injected into each machine's OpenCode config
+1. **Infisical Server** - Self-hosted secret manager stores your GitHub Copilot tokens
+2. **Sync Scripts** - Stored in this GitHub repo, pull credentials from Infisical
 3. **Bootstrap Scripts** - One-command setup for new machines
+4. **Automatic Sync** - Daily credential refresh (3:00 AM) via cron/Task Scheduler
 
-## Prerequisites
+**Key Improvement:** Sync scripts are now in GitHub (not Infisical), making updates easy and keeping Infisical focused on secrets only.
+
+## Quick Start
+
+### Prerequisites
 
 - A self-hosted Infisical instance (see [Setup Infisical Server](#setup-infisical-server) below)
 - OpenCode installed on your machine(s)
 - An active GitHub Copilot subscription
 
-## Quick Start
+### One-Time Setup: Add Credentials to Infisical
 
-### For New Machines
+On a machine where GitHub Copilot already works:
 
-**IMPORTANT:** Run the bootstrap script from a project/working directory (not your home directory). This ensures the Infisical project context is saved correctly.
+**Mac/Linux:**
+```bash
+cat ~/.local/share/opencode/auth.json
+```
+
+**Windows:**
+```powershell
+Get-Content "$env:USERPROFILE\.local\share\opencode\auth.json"
+```
+
+From the output, add these **two secrets** to your Infisical "OpenCode" project:
+
+1. **Secret Key:** `GITHUB_COPILOT_REFRESH_TOKEN`  
+   **Value:** The `refresh` token value (starts with `ghu_`)
+
+2. **Secret Key:** `GITHUB_COPILOT_ACCESS_TOKEN`  
+   **Value:** The `access` token value (starts with `tid=`)
+
+**That's it for Infisical!** You no longer need to store the sync scripts in Infisical.
+
+### Setup New Machines
+
+**IMPORTANT:** Navigate to a project/working directory first (not your home directory). This ensures `.infisical.json` is saved correctly.
 
 **Windows (PowerShell):**
 ```powershell
 # Navigate to a project directory first
 cd C:\Projects  # or wherever you want to work
+
+# Run bootstrap
 irm https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/bootstrap-windows.ps1 | iex
 ```
 
@@ -43,43 +72,22 @@ irm https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/b
 ```bash
 # Navigate to a project directory first
 cd ~/projects  # or wherever you want to work
+
+# Run bootstrap
 curl -fsSL https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/bootstrap-unix.sh | bash
 ```
 
 The bootstrap script will:
-1. Install Infisical CLI (if needed)
-2. Authenticate to your Infisical instance
-3. Initialize project (creates `.infisical.json` in current directory)
-4. Download and configure the sync script
-5. Sync GitHub Copilot credentials to OpenCode
-6. Sync OpenCode configuration from GitHub (includes Grok, Ollama, etc.)
-7. **Set up automatic daily sync at 3:00 AM**
+1. ✓ Install Infisical CLI (if needed)
+2. ✓ Authenticate to your Infisical instance
+3. ✓ Initialize project (creates `.infisical.json`)
+4. ✓ Download sync script from GitHub
+5. ✓ Sync GitHub Copilot credentials to OpenCode
+6. ✓ Set up automatic daily sync at 3:00 AM
 
-### Sync OpenCode Configuration Only
+### Manual Re-sync
 
-If you just want to sync your OpenCode configuration (model providers) without setting up Infisical:
-
-**Windows:**
-```powershell
-irm https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/sync-config.ps1 | iex
-```
-
-**Linux/Mac:**
-```bash
-curl -fsSL https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/sync-config.sh | bash
-```
-
-This will download a pre-configured `opencode.json` with:
-- Ollama Local (127.0.0.1:11434)
-- Ollama Remote (192.168.11.80:11434)
-- Grok (xAI) - requires API key
-- Ready to add more providers (DeepSeek, Groq, OpenRouter, etc.)
-
-See [config-templates/README.md](config-templates/README.md) for customization options.
-
-### Re-sync Credentials
-
-When credentials need to be refreshed:
+When you need to refresh credentials manually:
 
 **Windows:**
 ```powershell
@@ -223,85 +231,34 @@ infisical.yourdomain.com {
 
 ### 2. Add GitHub Copilot Credentials
 
-On a machine where OpenCode is already authenticated with GitHub Copilot:
+See [One-Time Setup](#one-time-setup-add-credentials-to-infisical) above.
 
-**Mac/Linux:**
-```bash
-cat ~/.local/share/opencode/auth.json
-```
+You only need to add **two secrets**:
+- `GITHUB_COPILOT_REFRESH_TOKEN`
+- `GITHUB_COPILOT_ACCESS_TOKEN`
+
+**No need to add sync scripts to Infisical anymore** - they're stored in this GitHub repo!
+
+## Sync OpenCode Configuration (Optional)
+
+If you want to sync your OpenCode model provider configuration across machines:
 
 **Windows:**
 ```powershell
-Get-Content "$env:USERPROFILE\.local\share\opencode\auth.json"
+irm https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/sync-config.ps1 | iex
 ```
 
-From the output, add these secrets to your Infisical project:
-
-1. **Secret Key:** `GITHUB_COPILOT_REFRESH_TOKEN`  
-   **Value:** The `refresh` token value
-
-2. **Secret Key:** `GITHUB_COPILOT_ACCESS_TOKEN`  
-   **Value:** The `access` token value
-
-### 3. Add Sync Scripts
-
-Add these two secrets to store the sync scripts:
-
-**Secret Key:** `SYNC_SCRIPT_WINDOWS`  
-**Value:**
-```powershell
-# Fetch secrets from Infisical
-$refreshToken = (infisical secrets get GITHUB_COPILOT_REFRESH_TOKEN --plain)
-$accessToken = (infisical secrets get GITHUB_COPILOT_ACCESS_TOKEN --plain)
-
-# Build the auth.json content
-$authContent = @{
-    "github-copilot" = @{
-        type = "oauth"
-        refresh = $refreshToken
-        access = $accessToken
-        expires = 1764799262000
-    }
-} | ConvertTo-Json -Depth 10
-
-# Write to OpenCode's auth.json
-$authPath = "$env:USERPROFILE\.local\share\opencode\auth.json"
-New-Item -ItemType Directory -Force -Path (Split-Path $authPath) | Out-Null
-$authContent | Out-File -FilePath $authPath -Encoding utf8 -Force
-
-Write-Host "GitHub Copilot credentials synced from Infisical to OpenCode!" -ForegroundColor Green
-```
-
-**Secret Key:** `SYNC_SCRIPT_UNIX`  
-**Value:**
+**Linux/Mac:**
 ```bash
-#!/bin/bash
-REFRESH_TOKEN=$(infisical secrets get GITHUB_COPILOT_REFRESH_TOKEN --plain)
-ACCESS_TOKEN=$(infisical secrets get GITHUB_COPILOT_ACCESS_TOKEN --plain)
-
-mkdir -p ~/.local/share/opencode
-
-cat > ~/.local/share/opencode/auth.json << EOF
-{
-  "github-copilot": {
-    "type": "oauth",
-    "refresh": "$REFRESH_TOKEN",
-    "access": "$ACCESS_TOKEN",
-    "expires": 1764799262000
-  }
-}
-EOF
-
-echo "GitHub Copilot credentials synced from Infisical to OpenCode!"
+curl -fsSL https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/sync-config.sh | bash
 ```
 
-## How It Works
+This downloads a pre-configured `opencode.json` with:
+- Ollama Local (127.0.0.1:11434)
+- Ollama Remote (192.168.11.80:11434)
+- Grok (xAI) - requires API key
 
-1. **One machine authenticates** with GitHub Copilot normally
-2. **Extract tokens** from that machine's OpenCode config
-3. **Store in Infisical** for centralized management
-4. **All other machines** pull tokens from Infisical
-5. **No session collisions** - all machines share the same credentials
+See [config-templates/README.md](config-templates/README.md) for customization options.
 
 ## Troubleshooting
 
@@ -309,20 +266,16 @@ echo "GitHub Copilot credentials synced from Infisical to OpenCode!"
 
 Make sure your Infisical domain is correct:
 
+**Windows:**
 ```powershell
-# Windows - custom domain
 $env:INFISICAL_DOMAIN = "https://your-infisical-domain.com"
 irm https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/bootstrap-windows.ps1 | iex
 ```
 
+**Linux/Mac:**
 ```bash
-# Linux/Mac - custom domain
 INFISICAL_DOMAIN=https://your-infisical-domain.com bash <(curl -fsSL https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/bootstrap-unix.sh)
 ```
-
-### Sync script not found in Infisical
-
-Make sure you've added the `SYNC_SCRIPT_WINDOWS` or `SYNC_SCRIPT_UNIX` secrets to your Infisical project as described in [Initial Infisical Configuration](#initial-infisical-configuration).
 
 ### OpenCode still asks for authentication
 
@@ -334,14 +287,44 @@ Make sure you've added the `SYNC_SCRIPT_WINDOWS` or `SYNC_SCRIPT_UNIX` secrets t
 
 3. Re-run the sync script
 
+### Sync script errors
+
+**"No .infisical.json found"**
+- You need to run the sync script from the directory where you ran bootstrap
+- Or cd to that directory first
+
+**"Failed to fetch credentials"**
+- Make sure you're logged in: `infisical login`
+- Verify secrets exist in Infisical: `infisical secrets list`
+- Check secret names match exactly: `GITHUB_COPILOT_ACCESS_TOKEN` and `GITHUB_COPILOT_REFRESH_TOKEN`
+
 ### Tokens expired
 
 When GitHub Copilot tokens expire:
 
-1. Authenticate OpenCode on one machine normally
-2. Extract the new tokens from that machine's auth.json
-3. Update the tokens in Infisical
+1. Authenticate OpenCode on one machine normally (let it get new tokens)
+2. Extract the new tokens from that machine's `~/.local/share/opencode/auth.json`
+3. Update the tokens in Infisical (via web UI)
 4. Re-run sync scripts on all other machines
+
+## What's New
+
+### v2.0 Improvements
+
+✅ **Sync scripts now in GitHub** (not Infisical)  
+✅ **Automatic expiry extraction** from access token  
+✅ **Better error handling** with colored output  
+✅ **Validation checks** at every step  
+✅ **Clearer documentation**  
+✅ **Windows & Linux parity** - both work the same way  
+
+### Migration from v1.0
+
+If you have the old setup with sync scripts in Infisical:
+
+1. Just run the new bootstrap script - it will download from GitHub
+2. (Optional) Remove old `SYNC_SCRIPT_UNIX` and `SYNC_SCRIPT_WINDOWS` secrets from Infisical
+3. Keep `GITHUB_COPILOT_ACCESS_TOKEN` and `GITHUB_COPILOT_REFRESH_TOKEN` - those are still needed!
 
 ## Security Considerations
 
@@ -350,6 +333,24 @@ When GitHub Copilot tokens expire:
 - **Use HTTPS** for all Infisical access
 - **Rotate tokens** when team members leave or keys are compromised
 - **Backup** your Infisical database regularly
+- **`.infisical.json`** should be in `.gitignore`
+
+## File Locations
+
+After setup:
+
+```
+~/.local/share/opencode/
+  └── auth.json                      # OpenCode credentials
+
+~/sync-opencode-auth.sh              # Sync script (Linux/Mac)
+~/sync-opencode-wrapper.sh           # Cron wrapper (Linux/Mac)
+
+%USERPROFILE%\sync-opencode-auth.ps1        # Sync script (Windows)
+%USERPROFILE%\sync-opencode-wrapper.ps1     # Task wrapper (Windows)
+
+.infisical.json                      # Infisical project config (in project dir)
+```
 
 ## License
 

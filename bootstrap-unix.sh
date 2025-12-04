@@ -3,10 +3,12 @@
 # Bootstrap script to setup OpenCode with Infisical for shared GitHub Copilot authentication.
 #
 # This script:
-# 1. Checks for Infisical CLI installation
+# 1. Installs Infisical CLI (if needed)
 # 2. Authenticates to your Infisical instance
-# 3. Downloads the sync script from Infisical
-# 4. Runs the sync to populate OpenCode's auth.json with GitHub Copilot credentials
+# 3. Initializes the Infisical project
+# 4. Downloads the sync script from GitHub
+# 5. Runs the sync to populate OpenCode's auth.json
+# 6. Sets up automatic daily sync via cron
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/bootstrap-unix.sh | bash
@@ -18,11 +20,39 @@
 
 set -e
 
+# Configuration
 INFISICAL_DOMAIN="${INFISICAL_DOMAIN:-https://infisical.thebaylors.org}"
-SYNC_CONFIG="${SYNC_CONFIG:-true}"
+GITHUB_RAW_URL="https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main"
+SYNC_SCRIPT_PATH="$HOME/sync-opencode-auth.sh"
+WRAPPER_SCRIPT_PATH="$HOME/sync-opencode-wrapper.sh"
 
-echo "=== OpenCode + Infisical Bootstrap Script ==="
-echo ""
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# Helper functions
+print_header() {
+    echo ""
+    echo -e "${BLUE}========================================${NC}"
+    echo -e "${BLUE}$1${NC}"
+    echo -e "${BLUE}========================================${NC}"
+    echo ""
+}
+
+print_step() {
+    echo -e "${GREEN}✓${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}✗${NC} $1" >&2
+}
+
+print_info() {
+    echo -e "${YELLOW}ℹ${NC} $1"
+}
 
 # Detect OS
 detect_os() {
@@ -43,141 +73,177 @@ detect_os() {
 
 OS=$(detect_os)
 
-# Check if Infisical CLI is installed
-echo "[1/5] Checking for Infisical CLI..."
-if ! command -v infisical &> /dev/null; then
-    echo "Infisical CLI not found. Installing..."
+print_header "OpenCode + Infisical Bootstrap"
+
+print_info "This script will configure OpenCode to use shared GitHub Copilot credentials"
+print_info "from your Infisical instance at: $INFISICAL_DOMAIN"
+echo ""
+
+# Step 1: Check/Install Infisical CLI
+print_header "[1/6] Checking Infisical CLI"
+
+if command -v infisical &> /dev/null; then
+    INFISICAL_VERSION=$(infisical --version 2>&1 | head -n1 || echo "unknown")
+    print_step "Infisical CLI already installed: $INFISICAL_VERSION"
+else
+    print_info "Infisical CLI not found. Installing..."
     
     case $OS in
         debian)
-            echo "Installing via apt..."
+            print_info "Installing via apt..."
             curl -1sLf 'https://dl.cloudsmith.io/public/infisical/infisical-cli/setup.deb.sh' | sudo -E bash
             sudo apt-get update && sudo apt-get install -y infisical
             ;;
         redhat)
-            echo "Installing via yum..."
+            print_info "Installing via yum..."
             curl -1sLf 'https://dl.cloudsmith.io/public/infisical/infisical-cli/setup.rpm.sh' | sudo -E bash
             sudo yum install -y infisical
             ;;
         macos)
             if command -v brew &> /dev/null; then
-                echo "Installing via Homebrew..."
+                print_info "Installing via Homebrew..."
                 brew install infisical/get-cli/infisical
             else
-                echo "Homebrew not found. Installing manually..."
-                curl -fsSL https://github.com/Infisical/cli/releases/latest/download/infisical_darwin_amd64 -o /tmp/infisical
-                chmod +x /tmp/infisical
-                sudo mv /tmp/infisical /usr/local/bin/infisical
+                print_error "Homebrew not found. Please install Homebrew first:"
+                print_info "https://brew.sh"
+                exit 1
             fi
             ;;
         *)
-            echo "Unsupported OS. Please install Infisical CLI manually from:"
-            echo "https://infisical.com/docs/cli/overview"
+            print_error "Unsupported OS. Please install Infisical CLI manually:"
+            print_info "https://infisical.com/docs/cli/overview"
             exit 1
             ;;
     esac
     
-    echo "Infisical CLI installed successfully!"
+    print_step "Infisical CLI installed successfully!"
+fi
+
+# Step 2: Authenticate to Infisical
+print_header "[2/6] Authenticating to Infisical"
+
+# Check if already logged in
+if infisical user &> /dev/null; then
+    CURRENT_USER=$(infisical user 2>/dev/null | grep -i email || echo "Unknown")
+    print_step "Already logged in to Infisical"
+    print_info "Current user: $CURRENT_USER"
 else
-    echo "Infisical CLI found!"
+    print_info "Opening browser for authentication to: $INFISICAL_DOMAIN"
+    
+    if ! infisical login --domain="$INFISICAL_DOMAIN"; then
+        print_error "Failed to authenticate to Infisical"
+        print_info "Please check that $INFISICAL_DOMAIN is accessible"
+        exit 1
+    fi
+    
+    print_step "Successfully authenticated!"
 fi
 
-echo ""
+# Step 3: Initialize Infisical project
+print_header "[3/6] Initializing Infisical Project"
 
-# Authenticate to Infisical
-echo "[2/5] Authenticating to Infisical..."
-echo "Opening browser for authentication..."
-
-if ! infisical login --domain="$INFISICAL_DOMAIN"; then
-    echo "Failed to authenticate to Infisical"
-    exit 1
+if [ -f ".infisical.json" ]; then
+    print_step "Infisical project already initialized in this directory"
+    print_info "Using existing configuration"
+else
+    print_info "Please select your organization and the 'OpenCode' project"
+    echo ""
+    
+    if ! infisical init; then
+        print_error "Failed to initialize Infisical project"
+        print_info "Make sure the 'OpenCode' project exists in your Infisical instance"
+        exit 1
+    fi
+    
+    print_step "Project initialized!"
 fi
 
-echo "Successfully authenticated!"
-echo ""
+# Save current directory for wrapper script
+CURRENT_DIR=$(pwd)
 
-# Initialize Infisical project
-echo "[3/5] Initializing Infisical project..."
-echo "Please select your organization and the 'OpenCode' project"
+# Step 4: Download sync script from GitHub
+print_header "[4/6] Downloading Sync Script"
 
-if ! infisical init; then
-    echo "Failed to initialize Infisical project"
-    exit 1
-fi
+print_info "Downloading from: $GITHUB_RAW_URL/sync-opencode-auth.sh"
 
-echo "Project initialized!"
-echo ""
-
-# Download sync script from Infisical
-echo "[4/5] Downloading sync script from Infisical..."
-
-SYNC_SCRIPT_PATH="$HOME/sync-opencode-auth.sh"
-
-if ! infisical secrets get SYNC_SCRIPT_UNIX --plain > "$SYNC_SCRIPT_PATH"; then
-    echo "Failed to download sync script from Infisical"
-    echo "Make sure the SYNC_SCRIPT_UNIX secret exists in your Infisical project"
+if ! curl -fsSL "$GITHUB_RAW_URL/sync-opencode-auth.sh" -o "$SYNC_SCRIPT_PATH"; then
+    print_error "Failed to download sync script from GitHub"
+    print_info "Please check your internet connection and try again"
     exit 1
 fi
 
 chmod +x "$SYNC_SCRIPT_PATH"
-echo "Sync script downloaded to: $SYNC_SCRIPT_PATH"
+print_step "Sync script downloaded to: $SYNC_SCRIPT_PATH"
+
+# Step 5: Run initial sync
+print_header "[5/6] Syncing GitHub Copilot Credentials"
+
+print_info "Running initial credential sync..."
 echo ""
 
-# Run the sync script
-echo "[5/5] Syncing GitHub Copilot credentials to OpenCode..."
-
+# Run sync from the project directory
+cd "$CURRENT_DIR"
 if ! "$SYNC_SCRIPT_PATH"; then
-    echo "Failed to sync credentials"
+    print_error "Failed to sync credentials"
+    print_info "Common issues:"
+    print_info "  - Credentials not set in Infisical"
+    print_info "  - Not in the directory with .infisical.json"
+    print_info "  - Not logged in to Infisical"
     exit 1
 fi
 
-echo ""
-echo "=== Setup Complete! ==="
-echo ""
-echo "Your OpenCode installation is now configured to use shared GitHub Copilot credentials from Infisical."
-echo ""
+# Step 6: Set up automatic daily sync
+print_header "[6/6] Setting Up Automatic Sync"
 
-# Optionally sync OpenCode config
-if [ "$SYNC_CONFIG" = "true" ]; then
-    echo "[Bonus] Syncing OpenCode configuration from GitHub..."
-    if curl -fsSL https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/sync-config.sh | bash; then
-        echo "OpenCode configuration synced successfully!"
-    else
-        echo "Failed to sync OpenCode config (non-fatal)"
-        echo "You can sync it manually later with:"
-        echo "  curl -fsSL https://raw.githubusercontent.com/mattbaylor/opencode-infisical-setup/main/sync-config.sh | bash"
-    fi
-    echo ""
-fi
+print_info "Creating wrapper script for cron..."
 
-# Set up automatic daily sync via cron
-echo "[6/6] Setting up automatic daily credential sync..."
-
-# Get current directory for .infisical.json context
-CURRENT_DIR=$(pwd)
-
-# Create a wrapper script that includes the directory change
-WRAPPER_SCRIPT="$HOME/sync-opencode-wrapper.sh"
-cat > "$WRAPPER_SCRIPT" << EOF
+# Create wrapper script that changes to the right directory
+cat > "$WRAPPER_SCRIPT_PATH" << EOF
 #!/bin/bash
-cd "$CURRENT_DIR"
-"$SYNC_SCRIPT_PATH"
+# Wrapper script for cron to ensure we're in the right directory
+cd "$CURRENT_DIR" || exit 1
+"$SYNC_SCRIPT_PATH" >> "$HOME/opencode-sync.log" 2>&1
 EOF
 
-chmod +x "$WRAPPER_SCRIPT"
+chmod +x "$WRAPPER_SCRIPT_PATH"
 
 # Add to crontab if not already present
-if ! crontab -l 2>/dev/null | grep -q "sync-opencode-wrapper.sh"; then
-    (crontab -l 2>/dev/null; echo "0 3 * * * $WRAPPER_SCRIPT") | crontab -
-    echo "Cron job added! Credentials will auto-sync daily at 3:00 AM"
+if crontab -l 2>/dev/null | grep -q "sync-opencode-wrapper.sh"; then
+    print_step "Cron job already exists"
+    crontab -l | grep "sync-opencode-wrapper.sh"
 else
-    echo "Cron job already exists"
+    print_info "Adding daily sync to crontab (3:00 AM)..."
+    (crontab -l 2>/dev/null; echo "0 3 * * * $WRAPPER_SCRIPT_PATH") | crontab -
+    print_step "Cron job added successfully!"
+    print_info "Logs will be written to: $HOME/opencode-sync.log"
 fi
 
+# Optional: Sync OpenCode configuration
+if [ -n "$SYNC_CONFIG" ] && [ "$SYNC_CONFIG" = "true" ]; then
+    print_header "[Bonus] Syncing OpenCode Configuration"
+    if curl -fsSL "$GITHUB_RAW_URL/sync-config.sh" | bash; then
+        print_step "OpenCode configuration synced!"
+    else
+        print_info "Skipped config sync (non-fatal)"
+    fi
+fi
+
+# Success summary
+print_header "Setup Complete!"
+
+echo -e "${GREEN}Your OpenCode installation is now configured!${NC}"
 echo ""
-echo "=== All Done! ==="
+echo "Summary:"
+echo "  ✓ Infisical CLI installed and authenticated"
+echo "  ✓ Project initialized in: $CURRENT_DIR"
+echo "  ✓ Sync script installed: $SYNC_SCRIPT_PATH"
+echo "  ✓ GitHub Copilot credentials synced"
+echo "  ✓ Automatic daily sync configured (3:00 AM)"
 echo ""
-echo "To manually re-sync credentials anytime, run:"
-echo "  $SYNC_SCRIPT_PATH"
+echo "Usage:"
+echo "  - Manual sync anytime: $SYNC_SCRIPT_PATH"
+echo "  - View sync logs: tail -f $HOME/opencode-sync.log"
+echo "  - Manage cron: crontab -e"
 echo ""
-echo "You can now use OpenCode with GitHub Copilot without authentication issues across VMs!"
+print_info "You can now use OpenCode with GitHub Copilot without session conflicts!"
+echo ""
