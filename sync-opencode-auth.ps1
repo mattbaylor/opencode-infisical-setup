@@ -66,8 +66,8 @@ $authContent = @{
     }
 } | ConvertTo-Json -Depth 10
 
-# Write to OpenCode's auth.json
-$authContent | Out-File -FilePath $OPENCODE_AUTH_FILE -Encoding utf8 -Force
+# Write to OpenCode's auth.json (UTF-8 without BOM to avoid Bun crashes)
+[System.IO.File]::WriteAllText($OPENCODE_AUTH_FILE, $authContent, [System.Text.UTF8Encoding]::new($false))
 
 Write-Success "GitHub Copilot credentials synced to OpenCode!"
 Write-Info "Auth file: $OPENCODE_AUTH_FILE"

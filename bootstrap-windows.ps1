@@ -217,7 +217,8 @@ Set-Location '$CURRENT_DIR'
 & '$SYNC_SCRIPT_PATH' >> '$env:USERPROFILE\opencode-sync.log' 2>&1
 "@
 
-$wrapperContent | Out-File -FilePath $WRAPPER_SCRIPT_PATH -Encoding utf8 -Force
+# Write wrapper script (UTF-8 without BOM)
+[System.IO.File]::WriteAllText($WRAPPER_SCRIPT_PATH, $wrapperContent, [System.Text.UTF8Encoding]::new($false))
 
 # Check if task already exists
 $taskName = "OpenCode-Sync"
